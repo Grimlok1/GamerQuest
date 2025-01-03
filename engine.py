@@ -8,15 +8,17 @@
 # Copyright:   (c) milo 2020
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
+
 import tcod as libtcod
 import math
 import textwrap
+import shelve
 
 SCREEN_WIDTH = 80
-SCREEN_HEIGHT = 50
+SCREEN_HEIGHT = 45
 
 MAP_WIDTH = 80
-MAP_HEIGHT = 43
+MAP_HEIGHT = 38
 
 ROOM_MAX_SIZE = 10
 ROOM_MIN_SIZE = 6
@@ -28,11 +30,13 @@ MAX_HEAL = 20
 LIGHTNING_DAMAGE = 20
 LIGHTNING_RANGE = 5
 
-FIREBALL_RANGE = 8
-FIREBALL_TARGETING_TYPE = 'lollipop'
-FIREBALL_DAMAGE = 12
-FIREBALL_IMPACT_AREA = (-1, -1, 2, 2)  # 3x3
-impact = None
+FIREBALL = {"max_range" : 8, "movable" : True, "damage" : 12, "spell_pene" : False, "pattern" : [(-1, -1),(0, -1),(1,-1),(-1,0),(0, 0),(1,0),(-1, 1),(0,1),(1,1)], "line_color" : libtcod.red, "pattern_color" : libtcod.red }
+FREEZE = {"max_range" : 5, "movable" : True, "damage" : 5, "spell_pene" : True, "pattern" : [(0, -2), (-1, -1), (0, -1), (1, -1), (-2, 0), (-1, 0), (0, 0), (1,0), (2, 0), (-1, 1), (0, 1), (1, 1), (0, 2)],
+    "line_color" : False, "pattern_color" : libtcod.red, "duration" : 5}
+ARCANE_BEAM = {"max_range" : 9, "movable" : True, "damage" : 10, "spell_pene" : True, "pattern" : False, "line_color" : libtcod.red, "pattern_color" : False}
+BOMB = {"max_range" : 5, "movable" : True, "damage" : 30, "spell_pene" : True, "pattern" : [(-1, -1),(0, -1),(1,-1),(-1,0),(0, 0),(1,0),(-1, 1),(0,1),(1,1)],
+    "line_color" : False, "pattern_color" : libtcod.red}
+
 
 FOV_ALGO = 0  #default FOV algorithm
 FOV_LIGHT_WALLS = True
@@ -41,7 +45,7 @@ TORCH_RADIUS = 10
 LIMIT_FPS = 20  #20 frames-per-second maximum
 
 MAX_ROOMS_MONSTERS = 3
-MAX_ROOM_ITEMS = 2
+MAX_ROOM_ITEMS = 3
 
 #for GUI
 BAR_WIDTH = 20
@@ -54,47 +58,148 @@ MSG_HEIGHT = PANEL_HEIGHT - 1
 
 INVENTORY_WIDTH = 50
 
+LEVEL_UP_BASE = 200
+LEVEL_UP_FACTOR = 150
+LEVEL_SCREEN_WIDTH = 40
+CHARACTER_SCREEN_WIDTH = 30
 
-#custom tiles
-wall_tile = 256
-floor_tile = 257
-player_tile = 258
-orc_tile = 259
-troll_tile = 260
-scroll_tile = 261
-healingpotion_tile = 262
-sword_tile = 263
-shield_tile = 264
-stairsdown_tile = 265
-dagger_tile = 266
-fireball_scroll_tile = 267
 
+#custom tiles. 256
+a = 256
+
+####jungle level
+#tiles
+jungle_wall = 256
+jungle_floor_1 = 257
+jungle_floor_2 = 258
+jungle_pond_large = (259, 260, 261, 262)
+jungle_pond_small = 263
+jungle_floor_3 = 264 #dirt
+
+#sand level
+sand_wall = 265
+sand_floor_1 = 266
+sand_floor_2 = 267
+
+#snow level
+snow_wall = 268
+snow_floor_1 = 269
+snow_floor_2 = 270
+
+#hell level
+hell_wall = 271
+hell_floor_1 = 272
+hell_floor_2 = 273
+hell_pool_small = 274
+hell_pool_large = (275, 276, 277, 278)
+
+#alien level
+alien_floor_1 = 279
+alien_wall_1 = 280
+alien_wall_2 = 281
+alien_wall_3 = 282
+alien_floor_2 = 283
+alien_floor_3 = 284
+
+#boss level
+boss_wall_1 = 285
+boss_wall_2 = 286 #moss
+boss_floor_1 = 287 #box
+boss_floor_2 = 288 #vent
+boss_floor_3 = 289 #stone
+boss_floor_4 = 290 #pattern
+boss_floor_5 = 291 #normal
+
+#characters
+knight = 292
+ranger = 293
+mage = 294
+
+goblin = 295
+goblin_dead = 296
+green_slime = 297
+tribal = 298
+tribal_dead = 299
+
+sand_elemental = 300
+stone_golem = 301
+stone_golem_dead = 302
+sand_slime = 303
+
+water_elemental = 304
+water_elemental_dead = 305
+evil_snowman = 306
+evil_snowman_dead = 307
+ice_slime = 308
+
+fire_elemental = 309
+imp = 310
+imp_dead = 311
+fire_slime = 312
+
+alien = 313
+alien_dead = 314
+ghost = 315
+ghost_dead = 316
+consumer = 317
+consumer_dead = 318
+
+#items
+fire_scroll = 320
+lightning_scroll = 321
+ice_scroll = 322
+ice_book = 323
+fire_book = 324
+lightning_book = 325
+wooden_sword = 326
+iron_sword = 327
+excalibur = 328
+bow = 329
+demon_bow = 330
+shield = 331
+ring = 332
+major_red_potion = 333
+major_green_potion = 334
+major_blue_potion = 335
+red_potion = 336
+blue_potion = 337
+green_potion = 338
+ice_cream = 339
+cola = 340
+coin = 341
+emerald = 342
+amethyst = 343
+nuclear_warhead = 344
+bomb = 345
+door = 346
+arcane_scroll = 347
+
+
+#480
 #fireball animation 3x3
 blank = " "
-
 fireball_frame1 = (blank, blank, blank,
-                    blank, 288, blank,
+                    blank, 352, blank,
                     blank, blank, blank,)
 
 fireball_frame2 = (blank, blank, blank,
-                    blank, 289, blank,
+                    blank, 353, blank,
                     blank, blank, blank)
+fireball_frame3 = (354, 355, 356,
+                357, 358, 359,
+                360, 361, 362)
 
-fireball_frame3 = (290, 291, 292,
-                293, 294, 295,
-                296, 297, 298)
+fireball_frame4 = (363, 364, 365,
+                366, 367, 368,
+                369, 370, 371)
 
-fireball_frame4 = (299, 300, 301,
-                302, 303, 304,
-                305, 306, 307)
+fireball_frame5 = (372, 373, 374,
+                375, 376, 377,
+                378, 379, 380)
 
-fireball_frame5 = (308, 309, 310,
-                311, 312, 313,
-                314, 315, 316)
-
-fireball_frame6 = (317, 318, 319,
-                320, 321, 322,
-                323, 324, 325)
+fireball_frame6 = (381, 382, 383,
+                384, 385, 386,
+                387, 388, 389)
 
 
 fireball_animation = [
@@ -106,17 +211,6 @@ fireball_frame5,
 fireball_frame6,
 ]
 
-
-def load_customfont():
-     #the index of the first custom tile in the file.
-    a = 256
-
-    #The "y" is the row index, here we load the sixth row in the font file. Increase the "6" to load any new rows from the file
-    for y in range(5,8):
-        libtcod.console_map_ascii_codes_to_font(a, 32, 0, y)
-        a += 32
-
-
 color_dark_wall = libtcod.Color(0, 0, 100)
 color_light_wall = libtcod.Color(130, 110, 50)
 color_dark_ground = libtcod.Color(50, 50, 150)
@@ -124,10 +218,22 @@ color_light_ground = libtcod.Color(200, 180, 50)
 color_pointer = libtcod.red
 
 
+
+def load_customfont():
+     #the index of the first custom tile in the file.
+    a = 256
+
+    #The "y" is the row index, here we load the sixth row in the font file. Increase the "6" to load any new rows from the file
+    for y in range(5,14):
+        libtcod.console_map_ascii_codes_to_font(a, 32, 0, y)
+        a += 32
+
+
 class Tile:
-    def __init__(self, blocked, block_sight = None):
+    def __init__(self, blocked, tile, block_sight = None):
         self.blocked = blocked
         self.explored = False
+        self.tile = tile
 
         if block_sight is None:
             block_sight = blocked
@@ -152,7 +258,7 @@ class Rect:
 
 class Object:
     #generic object for  a player,  a monster, an item etc
-    def __init__(self, x, y, char, name, color, blocks = False, fighter = None, ai = None, item = None):
+    def __init__(self, x, y, char, name, color, blocks = False, fighter = None, ai = None, item = None, score_item = None):
         self.is_target = False
         self.name = name
         self.blocks = blocks
@@ -161,21 +267,34 @@ class Object:
         self.char = char
         self.color = color
         self.fighter = fighter
+        self.ai = ai
+        self.item = item
+        self.score_item = score_item
+
         if self.fighter:
             self.fighter.owner = self
-        self.ai = ai
+
         if self.ai:
             self.ai.owner = self
-        self.item = item
+
         if self.item:
             self.item.owner = self
+
+        if self.score_item:
+            self.score_item.owner = self
+
     def move(self, dx, dy):
         #move given distance
         if not is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
 
+            for object in objects:
+                if object.score_item and object.x == player.x and object.y == player.y:
+                    object.score_item.pick_up()
+
     def move_towards(self, target_x, target_y):
+        global fov_recompute
         #vector from this object to the target, and distance
         dx = target_x - self.x
         dy = target_y - self.y
@@ -203,11 +322,11 @@ class Object:
 
     def clear(self):
         #erase character
-        libtcod.console_put_char(con, self.x, self.y, " ", libtcod.BKGND_NONE)
+        libtcod.console_set_char_background(con, self.x, self.y, libtcod.white, libtcod.BKGND_NONE)
 
     def targeted(self, line_color):
         self.color = line_color
-        if self.ai: #check if target is a monster
+        if self.fighter: #check if target is a fighter
             self.is_target = True
 
     def clear_targeted(self):
@@ -215,19 +334,37 @@ class Object:
 
 
 class Fighter:
-    def __init__(self, hp, defense, power, death_function=None):
+
+    def __init__(self, hp, mp, defense, power, magic, xp, score,  corpse=None, death_function=None, stun_recovery = 1, fire_resistance = 0, frost_resistance = 0, air_resistance = 0, earth_resistance = 0):
         self.max_hp = hp
         self.hp = hp
+
+        self.max_mp = mp
+        self.mp = mp
         self.defense = defense
         self.power = power
+        self.magic = magic
+        self.xp = xp
+        self.score = score
+        self.corpse = corpse
         self.death_function = death_function
+        self.stun_recovery = stun_recovery
+        self.fire_resistance = fire_resistance
+        self.frost_resistance = frost_resistance
+        self.air_resistance = air_resistance
+        self.earth_resistance = earth_resistance
+        self.stunned = 0
+
     def take_damage(self, damage):
         if damage > 0:
             self.hp -= damage
             if self.hp <= 0:
+                if self.owner != player:
+                    player.fighter.xp += self.xp
                 function = self.death_function
                 if function is not None:
                     function(self.owner)
+
     def attack(self, target):
         #simple formula to count attack damage
         damage = self.power - target.fighter.defense
@@ -236,23 +373,47 @@ class Fighter:
             message(self.owner.name.capitalize() + "attacks " + target.name + " for " + str(damage) + " hit points.")
             target.fighter.take_damage(damage)
         else:
-            messsage(self.owner.name.capitalize() + " attacks " + target.name + " but it has no effect!")
+            message(self.owner.name.capitalize() + " attacks " + target.name + " but it has no effect!")
     def heal(self, amount):
         #heal the given amount, without going over the maximum
         self.hp += amount
         if self.hp > self.max_hp:
             self.hp = self.max_hp
 
+    def regen_mana(self, amount):
+        #regen mana the given amount, without going over the maximum
+        self.mp += amount
+        if self.mp > self.max_mp:
+            self.mp = self.max_mp
+
+    def spend_mana(self, amount):
+        self.mp -= amount
+        if self.mp < 0:
+            message("You dont have enough mana to cast that", libtcod.red)
+            self.mp += amount
+
+    def recover_status(self):
+        self.stunned -= self.stun_recovery
+        if self.stunned <= 0:
+            self.stunned = 0
+
+    def set_stunned(self, duration, stun_message):
+        message(stun_message, libtcod.amber)
+        if self.stunned < duration:
+            self.stunned = duration
+
 class BasicMonster():
     #ai for basic monster
     def take_turn(self):
         monster = self.owner
         if libtcod.map_is_in_fov(fov_map, monster.x, monster.y):
+            if monster.fighter.stunned == 0: #can't attack if stunned
+                if monster.distance_to(player) >= 2:
+                    monster.move_towards(player.x, player.y)
+                elif player.fighter.hp > 0:
+                    monster.fighter.attack(player)
+        monster.fighter.recover_status()
 
-            if monster.distance_to(player) >= 2:
-                monster.move_towards(player.x, player.y)
-            elif player.fighter.hp > 0:
-                monster.fighter.attack(player)
 class Item:
     def __init__(self, use_function=None):
         self.use_function = use_function
@@ -260,7 +421,7 @@ class Item:
         if self.use_function is None:
             message("The " + self.owner.name + " cannot be used.")
         else:
-            if self.use_function(self = None) != "cancelled":
+            if self.use_function(self) != "cancelled":
                 inventory.remove(self.owner)
     def pick_up(self):
         if len(inventory) >= 26:
@@ -270,12 +431,30 @@ class Item:
             objects.remove(self.owner)
             message("You picked up a " + self.owner.name + "!", libtcod.green)
 
+class Score_item:
+    def __init__(self, value):
+        self.value = value
+    def pick_up(self):
+        parent = self.owner
+        message("You found " + parent.name + " it's worth " + str(self.value) + " points!", libtcod.gold)
+        player.fighter.score += self.value
+        objects.remove(self.owner)
+
+
+
+
+class Targetting_functions():
+    pass
+
 
 
 
 
 def menu(header, options, width):
     if len(options) > 26: raise ValueError('Cannot have a menu with more than 26 options.')
+
+    if header == '':
+        header_height = 0
 
     #calculate total height for the header (after auto-wrap) and one line per option
     header_height = libtcod.console_get_height_rect(con, 0, 0, width, SCREEN_HEIGHT, header)
@@ -336,13 +515,62 @@ def is_blocked(x, y):
             return True
     return False
 
+def generate_tile():
+    global dungeon_level
+    dice = libtcod.random_get_int(0, 0, 100)
+
+    if dungeon_level == 1:
+        if dice <= 70:
+            tile = jungle_floor_1
+        elif dice <= 70 + 20:
+            tile = jungle_floor_2
+        else:
+            tile = jungle_floor_3
+
+    if dungeon_level == 2:
+        if dice <= 70:
+            tile = sand_floor_1
+        else:
+            tile = sand_floor_2
+
+    if dungeon_level == 3:
+        if dice <= 70:
+            tile = snow_floor_1
+        else:
+            tile = snow_floor_2
+
+    if dungeon_level == 4:
+        if dice <= 70:
+            tile = hell_floor_1
+        else:
+            tile = hell_floor_2
+
+    if dungeon_level == 5:
+        if dice <= 60:
+            tile = alien_floor_2
+        elif dice <= 60 + 40:
+            tile = alien_floor_3
+
+    if dungeon_level == 6:
+        if dice <= 99:
+            tile = boss_floor_3
+        else:
+            tile = boss_floor_2
+
+
+    return tile
+
 def create_room(room):
     global map
+
     #go through the tiles in the rectangle and make them passable
     for x in range(room.x1 + 1, room.x2):
         for y in range(room.y1 + 1, room.y2):
+            dice = libtcod.random_get_int(0, 0, 100)
+
             map[x][y].blocked = False
             map[x][y].block_sight = False
+            map[x][y].tile = generate_tile()
 
 def create_h_tunnel(x1, x2, y):
     global map
@@ -350,6 +578,7 @@ def create_h_tunnel(x1, x2, y):
     for x in range(min(x1, x2), max(x1, x2) + 1):
         map[x][y].blocked = False
         map[x][y].block_sight = False
+        map[x][y].tile = generate_tile()
 
 def create_v_tunnel(y1, y2, x):
     global map
@@ -357,14 +586,66 @@ def create_v_tunnel(y1, y2, x):
     for y in range(min(y1, y2), max(y1, y2) + 1):
         map[x][y].blocked = False
         map[x][y].block_sight = False
+        map[x][y].tile = generate_tile()
+
+def next_level():
+    global dungeon_level
+    dungeon_level += 1
+
+    #advance to the next level
+    message('You take a moment to rest, and recover your strength.', libtcod.light_violet)
+    player.fighter.heal(player.fighter.max_hp / 2)  #heal the player by 50%
+
+    message('After a rare moment of peace, you descend deeper into the heart of the dungeon...', libtcod.red)
+    make_map()  #create a fresh new level!
+    initialize_fov()
+
+
+def generate_wall():
+    global dungeon_level
+    if dungeon_level == 1:
+        wall = jungle_wall
+    if dungeon_level == 2:
+        wall = sand_wall
+    if dungeon_level == 3:
+        wall = snow_wall
+    if dungeon_level == 4:
+        wall = hell_wall
+    if dungeon_level == 5:
+        dice = libtcod.random_get_int(0, 0, 100)
+        if dice <= 34:
+            wall = alien_wall_1
+        elif dice <= 34 + 33:
+            wall = alien_wall_2
+        elif dice <= 34 + 33 + 33:
+            wall = alien_wall_3
+    if dungeon_level == 6:
+        dice = libtcod.random_get_int(0,0, 100)
+        if dice <= 70:
+            wall = boss_wall_1
+        else:
+            wall = boss_wall_2
+    return wall
+
+
 
 def make_map():
-    global map
+    global map, objects, dungeon_level, stairs
 
+    #the list of objects with just the player
+    objects = [player]
 
-    map = [[Tile(True) #fill map with blocked tiles
-        for y in range(MAP_HEIGHT)]
+    map = [[ Tile(True, None)
+        for y in range(MAP_HEIGHT) ]
             for x in range(MAP_WIDTH) ]
+
+    for y in range(MAP_HEIGHT): #randomize tiles
+        for x in range(MAP_WIDTH):
+            wall = generate_wall()
+            tile = Tile(True, wall)
+            map[x][y] = tile
+
+
     rooms = []
     num_rooms = 0
     for r in range (MAX_ROOMS):
@@ -385,8 +666,7 @@ def make_map():
             create_room(new_room)
             place_objects(new_room)
             (new_x, new_y) = new_room.center()
-##            room_no = Object(new_x, new_y, chr(65+num_rooms), 'room number', libtcod.white)
-##            objects.insert(0, room_no)
+
             if num_rooms == 0:  #first room set player there
                 player.x = new_x
                 player.y = new_y
@@ -402,53 +682,98 @@ def make_map():
                     create_h_tunnel(prev_x, new_x, new_y)
             rooms.append(new_room)
             num_rooms += 1
+    #if dungeon_level < 6:
+        #stairs = Object(new_x, new_y, '<', 'stairs', libtcod.white)
+        #objects.append(stairs)
+        #stairs.send_to_back()
+
+
+def random_choice_index(chances):  #choose one option from list of chances, returning its index
+    #the dice will land on some number between 1 and the sum of the chances
+    dice = libtcod.random_get_int(0, 1, sum(chances))
+
+    #go through all chances, keeping the sum so far
+    running_sum = 0
+    choice = 0
+    for w in chances:
+        running_sum += w
+
+        #see if the dice landed in the part that corresponds to this choice
+        if dice <= running_sum:
+            return choice
+        choice += 1
+
+def random_choice(chances_dict):
+    #choose one option from dictionary of chances, returning its key
+    strings = list(chances_dict.keys())
+    chances = chances_dict.values()
+    index = random_choice_index(chances)
+    return strings[index]
+
 
 def place_objects(room):
+#place monster
+    global all_monster_chances, dungeon_level, all_monsters, all_item_chances
+    monster_chances = all_monster_chances[dungeon_level]
+
     num_monsters = libtcod.random_get_int(0, 0, MAX_ROOMS_MONSTERS)
+
     for i in range(num_monsters):
         x = libtcod.random_get_int(0, room.x1+1, room.x2-1)
         y = libtcod.random_get_int(0, room.y1+1, room.y2-1)
         if not is_blocked(x, y):
-            if libtcod.random_get_int(0, 0, 100) < 80:
 
-                #create an orc
-                fighter_component = Fighter(hp=10, defense=0, power=3, death_function=monster_death)
-                ai_component = BasicMonster()
+            choice = random_choice(monster_chances)
+            monster = all_monsters[choice]
+            name = choice
+            tile, hp, mp, defense, power, magic, xp, score, corpse, death_function, stun_recovery, fire_resistance, frost_resistance, air_resistance, earth_resistance = monster
 
-                monster = Object(x, y, orc_tile, "orc", libtcod.white,
-                    blocks=True, fighter=fighter_component, ai=ai_component)
-            else:
-                fighter_component = Fighter(hp=16, defense=1, power=4, death_function=monster_death)
-                ai_component = BasicMonster()
-                monster = Object(x, y, troll_tile, "Troll", libtcod.white,
-                    blocks=True, fighter=fighter_component, ai=ai_component)
+
+            fighter_component = Fighter(hp, mp, defense, power, magic, xp, score, corpse, death_function, stun_recovery,
+                fire_resistance, frost_resistance, air_resistance, earth_resistance)
+
+            ai_component = BasicMonster()
+            monster = Object(x, y, tile, name, libtcod.white,
+                blocks=True, fighter=fighter_component, ai=ai_component)
             objects.append(monster)
-        #choose random number of items
+
+
+#place items
+    item_chances = all_item_chances[dungeon_level]
+    #choose random number of items
     num_items = libtcod.random_get_int(0, 0, MAX_ROOM_ITEMS)
+    #choose a item in random and repeat it for num_items
 
     for i in range(num_items):
         #choose random spot for this item
         x = libtcod.random_get_int(0, room.x1+1, room.x2-1)
         y = libtcod.random_get_int(0, room.y1+1, room.y2-1)
-
         #only place it if the tile is not blocked
         if not is_blocked(x, y):
-            #trow a dice
-            dice = libtcod.random_get_int(0, 0, 100)
-##            if dice < 70:
-##                item_component = Item(use_function=cast_heal)
-##                item = Object(x, y, healingpotion_tile, 'healing potion', libtcod.white, item=item_component)
-##            elif dice < 70 + 10:
-##                #create a lightning bolt scroll(30% chance)
-##                item_component = Item(use_function=cast_lightning)
-##                item = Object(x, y, scroll_tile, 'scroll of lightning bolt', libtcod.white, item=item_component)
-            if dice < 70:
-                #create a fire bolt scroll
-                item_component = Item(use_function=cast_fireball)
-                item = Object(x,y, fireball_scroll_tile, "scroll of fireball", libtcod.white, item=item_component)
+            category = random_choice(item_category_chances) #roll for caregory
 
-                objects.append(item)
-                item.send_to_back()  #items appear below other objects
+             #if score choose from score items
+            if category == "score":
+                choice = random_choice(score_chances)#roll for item
+                item = all_score_items[choice]
+                name = choice
+                tile, value = item
+
+                score_component = Score_item(value)
+                item = Object(x, y, tile, name, libtcod.white, score_item = score_component)
+
+            #if consumable choose from consuable items
+            elif category == "consumable":
+                choice = random_choice(item_chances)
+                item = all_items[choice]
+                name = choice
+                tile, use_function = item
+
+                item_component = Item(use_function)
+                item = Object(x, y, tile, name, libtcod.white, item=item_component)
+
+            objects.append(item)
+            item.send_to_back()  #items appear below other objects
 
 
 
@@ -470,27 +795,26 @@ def render_bar(x, y, total_width, name, value, maximum, bar_color, back_color):
         libtcod.console_print_ex(panel, int(x + total_width / 2), y, libtcod.BKGND_NONE, libtcod.CENTER,
             name + ': ' + str(value) + '/' + str(maximum))
 
-def render_cursor():
-    global mouse
-    libtcod.console_clear(cursos_panel) #clear old
-    libtcod.console_set_char_background(cursos_panel, mouse.cx, mouse.cy, color_pointer, libtcod.BKGND_SET)
-
 def get_names_under_mouse():
     global mouse
 
     #return a string with the names of all objects under the mouse
     (x, y) = (mouse.cx, mouse.cy)
     names = [obj.name for obj in objects
-    if obj.x == x and obj.y == y and libtcod.map_is_in_fov(fov_map, obj.x, obj.y)]
+    if obj.x == x and obj.y == y and libtcod.map_is_in_fov(fov_map, obj.x, obj.y) and obj.name != None]
     #create a list with names of all the objects in mouse's cordinate and in fov.
     names =  ", ".join(names)
     return names.capitalize()
+
+
+###############################################################################################
+## RENDER_ALL
+################################################################################################
 
 def render_all():
     global fov_map, color_dark_wall, color_light_wall
     global color_dark_ground, color_light_ground
     global fov_recompute
-    global animation_playing
 
     if fov_recompute:
         fov_recompute = False
@@ -500,30 +824,28 @@ def render_all():
             for x in range(MAP_WIDTH):
                 visible = libtcod.map_is_in_fov(fov_map, x, y )
                 wall = map[x][y].block_sight
+                tile = map[x][y].tile
                 if not visible:
                     if map[x][y].explored:
                         if wall:
-                            libtcod.console_put_char_ex(con, x, y, wall_tile, libtcod.grey, libtcod.black)
+                            libtcod.console_put_char_ex(con, x, y, tile, libtcod.grey, libtcod.black)
                         else:
-                            libtcod.console_put_char_ex(con, x, y, floor_tile, libtcod.grey, libtcod.black)
+                            libtcod.console_put_char_ex(con, x, y, tile, libtcod.grey, libtcod.black)
                 else:
                     if wall:
-                        libtcod.console_put_char_ex(con, x, y, wall_tile, libtcod.white, libtcod.black)
+                        libtcod.console_put_char_ex(con, x, y, tile, libtcod.white, libtcod.black)
                     else:
-                        libtcod.console_put_char_ex(con, x, y, floor_tile, libtcod.white, libtcod.black)
+                        libtcod.console_put_char_ex(con, x, y, tile, libtcod.white, libtcod.black)
                         #since it's visible, explore it
                     map[x][y].explored = True
 
     #draw objects
-    if animation_playing == False:
+    for object in objects:
+        if object != player:
+            object.draw()
+    player.draw()
 
-        for object in objects:
-            if object != player:
-                object.draw()
-        player.draw()
-
-    animation_playing = False
-
+    #blit default console
     libtcod.console_blit(con, 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0, 0)
 
     #prepare to render the GUI panel
@@ -541,6 +863,8 @@ def render_all():
     #show the player's stats
     render_bar(1, 1, BAR_WIDTH, 'HP', player.fighter.hp, player.fighter.max_hp,
         libtcod.light_red, libtcod.darker_red)
+    render_bar(1, 2, BAR_WIDTH, "MP", player.fighter.mp, player.fighter.max_mp,
+        libtcod.light_blue, libtcod.darker_blue)
 
         #display names of objects under the mouse
     libtcod.console_set_default_foreground(panel, libtcod.light_gray)
@@ -548,6 +872,9 @@ def render_all():
 
     #blit the contents of "panel" to the root console
     libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, PANEL_Y)
+
+#######################################################################################################
+#######################################################################################################
 
 
 def message(new_msg, color = libtcod.white):
@@ -559,10 +886,10 @@ def message(new_msg, color = libtcod.white):
         game_msgs.append((line, color))
 
 
-
-
 def player_move_or_attack(dx, dy):
     global fov_recompute
+
+    fov_recompute = True
 
     #the coordinates the player is moving to/attacking
     x = player.x + dx
@@ -575,12 +902,39 @@ def player_move_or_attack(dx, dy):
             target = object
             break
 
+
     #attack if target found, move otherwise
+
     if target is not None:
         player.fighter.attack(target)
     else:
         player.move(dx, dy)
-        fov_recompute = True
+
+
+def check_level_up():
+    #see if experience is enough to level up
+    level_up_xp = LEVEL_UP_BASE + player.level * LEVEL_UP_FACTOR
+    if player.fighter.xp >= level_up_xp:
+        player.level += 1
+        player.fighter.xp -= level_up_xp
+        message("Your skills have improved You reached level " +str(player.level) + "!", libtcod.yellow)
+        choice = None
+        while choice == None: #keep asking until choise is made
+            choice = menu('Level up! Choose a stat to raise:\n',
+                ['Constitution (+20 HP, from ' + str(player.fighter.max_hp) + ')',
+                'Strength (+1 attack, from ' + str(player.fighter.power) + ')',
+                'Agility (+1 defense, from ' + str(player.fighter.defense) + ')',
+                'Magic (+1 magic from' + str(player.fighter.magic) + ')'], LEVEL_SCREEN_WIDTH)
+        if choice == 0:
+            player.fighter.max_hp += 20
+            player.fighter.hp += 20
+        elif choice == 1:
+            player.fighter.power += 1
+        elif choice == 2:
+            player.fighter.defense += 1
+        elif choice == 3:
+            player.fighter.magic += 1
+
 
 def player_death(player):
     #the game ended!
@@ -596,13 +950,16 @@ def monster_death(monster):
     #transform it into a nasty corpse! it doesn't block, can't be
     #attacked and doesn't move
     message(monster.name.capitalize() + ' is dead!', libtcod.orange)
-    monster.char = '%'
-    monster.color = libtcod.dark_red
-    monster.blocks = False
-    monster.fighter = None
-    monster.ai = None
-    monster.name = 'remains of ' + monster.name
-    monster.send_to_back()
+    if monster.fighter.corpse:
+        monster.char = monster.fighter.corpse
+        monster.name = 'remains of ' + monster.name
+        monster.send_to_back()
+        monster.blocks = False
+        monster.fighter = None
+        monster.ai = None
+    else:
+        objects.remove(monster)
+
 
 def closest_monster(max_range):
     #find the closest enemy, up to maximum ranege, and in the player's fov
@@ -623,10 +980,18 @@ def cast_heal(item):
         message("You are already at full health.", libtcod.red)
         return "cancelled"
     amount_healed = libtcod.random_get_int(0, MIN_HEAL, MAX_HEAL)
-    message("Your wounds start to feel better. " + item.owner.name.capitalize() +" heals you for " + str(amount_healed), libtcod.light_violet)
+    message("Your wounds start to feel better. " + item.owner.name.capitalize() +" heals you for " + str(amount_healed), libtcod.green)
     player.fighter.heal(amount_healed)
 
-def cast_lightning():
+def cast_regen_mana(self):
+    if player.fighter.mp == player.fighter.max_mp:
+        message("You are already at full mana." , libtcod.red)
+        return "cancelled"
+    mana_gained = libtcod.random_get_int(10, MAX_HEAL)
+    message("Some of your mana has been recharged. " +  "You gain  " + str(amount_healed) +  " Mana points", libtcod.green)
+    player.fighter.regen_mana(mana_gained)
+
+def cast_lightning(self):
     #find closest enemy (inside a maximum range) and damage it
     monster = closest_monster(LIGHTNING_RANGE)
     if monster is None: #no enemy, in range
@@ -639,36 +1004,26 @@ def cast_lightning():
 
 def cast_fireball(self):
     global fov_recompute
-    global animation_playing
 
-    message("you beging to channel the fireball", libtcod.desaturated_flame)
-    boolean, impact = spell_targetting(FIREBALL_RANGE, FIREBALL_TARGETING_TYPE, FIREBALL_IMPACT_AREA)
-    print(impact)
+    boolean, pattern, line = spell_targetting(player, FIREBALL)
+    damage = FIREBALL["damage"]
+
     if boolean == True:
         for obj in objects:
             if obj.is_target:
-                message('The ' + obj.name + ' gets burned for ' + str(FIREBALL_DAMAGE) + ' hit points.', libtcod.orange)
-                obj.fighter.take_damage(FIREBALL_DAMAGE)
-
+                message('The ' + obj.name + ' gets burned for ' + str(damage) + ' hit points.', libtcod.orange)
+                obj.fighter.take_damage(damage)
         clear_targets()
 ##      Animation
-        x1, y1, x2, y2 = impact
-        current_frame = 0
-        for frame in fireball_animation: #num of frames
-            dx = 0
-            dy = 0
 
-            for cel in frame:
-                libtcod.console_put_char(con, x1 + dx, y1 + dy, cel, libtcod.BKGND_SET)
-                if dx < 2: #x1 + dx < x2
-                    dx = dx + 1
-                else:
-                    dx = 0
-                    dy = dy + 1
-            animation_playing = True
-            render_all()
+        for frame in fireball_animation: #num of frames
+            i = 0
+            for tile in frame:
+                x, y = pattern[i]
+                libtcod.console_put_char(con, x, y, tile, libtcod.BKGND_NONE)
+                i = i + 1
+            libtcod.console_blit(con, 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0, 0)
             libtcod.console_flush() #flush a frame
-            current_frame = current_frame + 1
 
         fov_recompute = True #remove the explotion
         render_all()
@@ -678,7 +1033,74 @@ def cast_fireball(self):
         clear_targets()
         return "cancelled"
 
+def cast_freeze(self):
+    global fov_recompute
 
+    boolean, pattern  = spell_targetting(player, FREEZE)
+    damage = FREEZE["damage"]
+    duration = FREEZE["duration"]
+
+    if boolean == True:
+        for obj in objects:
+            if obj.is_target:
+                message('The ' +obj.name + ' freezes in place and sufferes ' + str(damage) + ' hit points', libtcod.azure)
+                obj.fighter.take_damage(damage)
+                stun_message = 'The '+obj.name+ ' is frozen for '+ str(duration) +' turns'
+                obj.fighter.set_stunned(duration, stun_message)
+        clear_targets()
+    else:
+        clear_targets()
+        return "cancelled"
+
+def cast_arcane_beam(self):
+    global fov_recompute
+
+    boolean, line = spell_targetting(player, ARCANE_BEAM)
+    DAMAGE = ARCANE_BEAM["damage"]
+    if boolean == True:
+        for obj in objects:
+            if obj.is_target:
+                message("The " +obj.name + " gets harmed by arcane beam for " + str(DAMAGE) + " hit points", libtcod.crimson)
+                obj.fighter.take_damage(DAMAGE)
+        clear_targets()
+    else:
+        clear_targets()
+        return "cancelled"
+
+def cast_bomb(self):
+    global fov_recompute
+    boolean, pattern = spell_targetting(player, BOMB)
+    DAMAGE = BOMB["damage"]
+    if boolean == True:
+        for obj in objects:
+            if obj.is_target:
+                message("The " +obj.name + " gets hit by the explotion for  " + str(DAMAGE) + " hit points", libtcod.orange)
+                obj.fighter.take_damage(DAMAGE)
+        clear_targets()
+        #animation
+        for frame in fireball_animation: #num of frames
+            i = 0
+            for tile in frame:
+                x, y = pattern[i]
+                libtcod.console_put_char(con, x, y, tile, libtcod.BKGND_NONE)
+                i = i + 1
+            libtcod.console_blit(con, 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0, 0)
+            libtcod.console_flush() #flush a frame
+
+        fov_recompute = True #remove the explotion
+        render_all()
+        libtcod.console_flush()
+    else:
+        clear_targets()
+        return "cancelled"
+
+
+
+
+
+############################################################################################################
+## SPELL TARGETTING FUNCTION
+############################################################################################################
 
 def clear_targets():
     for object in objects:
@@ -688,227 +1110,191 @@ def clear_marked():
     for object in objects:
         object.color = libtcod.white
 
-def spell_targetting(MAX_RANGE, SPELL_TARGETING_TYPE, IMPACT_AREA=None, SPELL_PENETRATON=None):
+
+def spell_targetting(caster, spell):
+    #Static variables
+
+    MAX_RANGE = spell["max_range"]
+    MOVABLE = spell["movable"]
+    SPELL_PENE = spell["spell_pene"]
+    PATTERN = spell["pattern"]
+    LINE_COLOR = spell["line_color"]
+    PATTERN_COLOR = spell["pattern_color"]
 
     def distance(x1, y1, x2, y2):
-     dx = x1 - x2
-     dy = y1 - y2
-     return math.sqrt(dx ** 2 + dy ** 2)
-##
-##    def draw_circle_impact(x,y):
-##        dec = int((IMPACT_AREA - 1) / 2) #decrease to get to upper corner, from center
-##        x1 = x - dec
-##        y1 = y - dec
-##        x2 =  x + IMPACT_AREA
-##        y2 = y + IMPACT_AREA
-##
-##        for x in range(x1, x2):
-##            for y in range(y1, y2):
-##
-##                libtcod.console_set_char_background(cursos_panel, x, y, libtcod.green, libtcod.BKGND_SET)
-##                #check if object is targeted
-##                for object in objects:
-##                   if object.ai and (object.x == x and object.y == y):
-##                       targets.append(object)
+        dx = x1 - x2
+        dy = y1 - y2
+        return math.sqrt(dx ** 2 + dy ** 2)
 
-##    def draw_line_impact(x,y):
-##
-##
-##        inc = int((IMPACT_AREA - 1)/ 2)
-##
-##        for x in range(x1, x2):
-##            for y in range(y1, y2):
-##                libtcod.console_set_char_background(cursos_panel, x, y, libtcod.green, libtcod.BKGND_SET)
-##                #check targeted objects
-##                for object in objects: #check if object is targeted
-##                   if object.ai and (object.x == x and object.y == y):
-##                       targets.append(object)
+    def check_for_target_collision(x, y, object, color):
+        if object.x == x and object.y == y: #check if line hits object, and target it.
+            object.targeted(color)
 
-##    def lollipop_spell_listener(x,y):
-##        tile = map[x][y]
-##        if is_spell_blocked(x,y) or MAX_RANGE <= distance(player.x, player.y, x, y) or (x == mouse.cx and y == mouse.cy): #tile is blocked(and you dont have spell penetration) stop the line, or max range has been reached
-##            libtcod.console_set_char_background(cursos_panel, x, y, color_pointer, libtcod.BKGND_SET)#set the last tile to red.
-##            draw_circle_impact(x,y) #draw the impact area.
-##            return False
-##        if not(player.x == x and player.y == y):
-##            libtcod.console_set_char_background() #color line tile red
-##        return True
+    def check_for_spell_penetration(x, y, object):
+        if object.x == x and object.y == y:
+            if (SPELL_PENE == False) and object.fighter:
+                return True
+        return False
 
-##    def circle_spell_listener(x,y):
-##        tile = map[x][y]
-##        if is_spell_blocked(x,y) or MAX_RANGE <= distance(player.x, player.y, x, y) or (x == mouse.cx and y == mouse.cy): #tile is blocked(and you dont have spell penetration) stop the line, or max range has been reached
-##            draw_circle_impact(x,y) #draw the impact area.
-##            return False
-##        return True
+    def check_for_collition(x,y):
+         #check if tile is blocked
+        if map[x][y].blocked:
+            return True
+        #check if mouse line has reached mouse or if mouse is in max range
+        if MAX_RANGE <= distance(player.x, player.y, x, y) or (x == mouse.cx and y == mouse.cy):
+            return True
+        return False
 
-    def draw_impact(x,y):
-        global impact
-        #draw rectangle
-        dx1, dy1, dx2, dy2 = IMPACT_AREA
+    def draw_line(x, y):
 
-        x1 = x + dx1
-        y1 = y + dy1
-        x2 = x + dx2
-        y2 = y + dy2
-
-        impact = (x1, y1, x2, y2)
-
-
-        for x in range(x1, x2):
-            for y in range(y1, y2):
-                libtcod.console_set_char_foreground(con, x, y, libtcod.green)
+        def check_line_collition(x,y):
+            stop = False
+            # if draws a line, check if line x and y collide with enemy target
+            if LINE_COLOR:
+                libtcod.console_set_char_foreground(con, x, y, LINE_COLOR)
                 for object in objects:
-                   if object.ai and (object.x == x and object.y == y):
-                    object.targeted(libtcod.green)
+                    if object != caster:
+                        check_for_target_collision(x, y, object, LINE_COLOR)
+                        stop = check_for_spell_penetration(x, y, object)
+                        if stop:
+                            break
+            if stop == False:
+                stop = check_for_collition(x,y)
+            return stop
 
 
-    def draw_lollipop(x,y):
-        line_color = libtcod.red #might move this to constan
-        libtcod.console_set_char_foreground(con, x, y, line_color)
+        libtcod.line_init(player.x, player.y, x, y) #initialize a new line
+        x, y = libtcod.line_step()
 
-        #check if line colides with objects.
-        for object in objects:
-            if object != player and (object.x == x and object.y == y): #check if line hits object
-                if not(SPELL_PENETRATON) and object.ai: #check for spell pene
-                    draw_impact(x,y)
-                    return False
+        if x == None:       #special case
+            x = caster.x
+            y = caster.y
 
-        #check if tile is blocked
-        if map[x][y].blocked:
-            draw_impact(x,y)
-            return False
+        stop = check_line_collition(x, y)
+        line = []
+        line.append((x, y))
 
-        #check if mouse line has reached mouse or if mouse is in max range
-        if MAX_RANGE <= distance(player.x, player.y, x, y) or (x == mouse.cx and y == mouse.cy):
-            draw_impact(x,y)
-            return False
+        while not stop:
+            x, y = libtcod.line_step()
+            line.append((x,y))
+            stop = check_line_collition(x, y)
 
-        return True
+        return line, x, y
 
-    def draw_line(x,y):
-        line_color = libtcod.green #might move this to constan
-        libtcod.console_set_char_foreground(con, x, y, line_color)
-
-        #check if line colides with objects.
-        for object in objects:
-            if object != player and (object.x == x and object.y == y): #check if line hits object
-                object.targeted(line_color) #target object
-                if not(SPELL_PENETRATON) and object.ai: #check for spell pene
-                    return False
-
-        #check if tile is blocked
-        if map[x][y].blocked:
-            return False
-
-        #check if mouse line has reached mouse or if mouse is in max range
-        if MAX_RANGE <= distance(player.x, player.y, x, y) or (x == mouse.cx and y == mouse.cy):
-            return False
-
-        return True
+        #if line x, y hasn't collided with a monster, check if it collides with a wall or has reach the mouse position.
 
 
-##            if SPELL_TARGETING_TYPE == 'lollipop':
-##
-##                libtcod.line(player.x, player.y, mouse.cx, mouse.cy, lollipop_spell_listener)
+    def draw_targeting_pattern(x, y):
+        pattern = []
+        for cel in PATTERN: #count new x and y for each cel in pattern
+            c_x, c_y = cel
+            c_x = c_x + x
+            c_y = c_y + y
+            new_cel = (c_x, c_y)
+            pattern.append(new_cel)
+        for cel in pattern: #draw tagetting pattern and target objects in it
+            c_x, c_y, = cel
+            libtcod.console_set_char_foreground(con, c_x, c_y, PATTERN_COLOR)
+            for object in objects:
+                check_for_target_collision(c_x, c_y, object, PATTERN_COLOR)
+        return pattern
 
-##            elif SPELL_TARGETING_TYPE == "circle":
-##
-##                libtcod.line(player.x, player.y, mouse.cx, mouse.cy, circle_spell_listener)
+    def draw_new_pattern(x, y):
+        line, p_x, p_y = draw_line(x,y)
 
-    if SPELL_TARGETING_TYPE == 'line':
-        iter_func = draw_line
-    elif SPELL_TARGETING_TYPE == 'lollipop':
-        iter_func = draw_lollipop
-    elif SPELL_TARGETING_TYPE == 'chain':
-        iter_func = draw_chain
-
-    global key, mouse
-    global fov_recompute
-    global impact
-
-
-
-
-    #remove inventory
-    libtcod.line(player.x, player.y, mouse.cx, mouse.cy, iter_func) #draws first line
-    render_all() #render line
-    libtcod.console_flush()
-    is_spell_cast = None #return if spell was cast or not
+        if PATTERN:
+            pattern = draw_targeting_pattern(p_x, p_y)
+            return pattern, line
+        else:
+            return False, line
 
 
-    while True:
-        x = mouse.cx
-        y = mouse.cy
-        libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS|libtcod.EVENT_MOUSE, key, mouse) #update the mouse status
-
-        if x != mouse.cx or y != mouse.cy: #if mouse moved. remove the line and targets
-
-            #clear old line
-            fov_recompute = True
-            clear_marked()
-            clear_targets()
-            render_all()
-
-            #draw newline
-            libtcod.line(player.x, player.y, mouse.cx, mouse.cy, iter_func) #iterator that draws the line
-            render_all()
-            libtcod.console_flush()
-
-        if mouse.lbutton_pressed:
-            fov_recompute = True
-            is_spell_cast = True
-            clear_marked()
-
-        if mouse.rbutton_pressed or key.vk == libtcod.KEY_ESCAPE:
-            fov_recompute = True
-            is_spell_cast = False
-            clear_marked()
+    def clear_old_pattern():
+        global fov_recompute
+        fov_recompute = True
+        clear_marked()
+        clear_targets()
+        render_all()
 
 
+    def target_movable_Spell(): #always cast by player
+        global key, mouse
+        global fov_recompute
 
-        if is_spell_cast != None:
-            return is_spell_cast, impact
+        is_spell_cast = None
+        pattern, line = draw_new_pattern(mouse.cx, mouse.cy)
+        render_all()
+        libtcod.console_flush()
 
+        while True:
+            x = mouse.cx
+            y = mouse.cy
+            libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS|libtcod.EVENT_MOUSE, key, mouse) #update the mouse status
 
+            if x != mouse.cx or y != mouse.cy: #if mouse moved. remove the line and targets
+                clear_old_pattern()
+                pattern, line = draw_new_pattern(mouse.cx, mouse.cy)
+                render_all()
+                libtcod.console_flush()
 
+            if mouse.lbutton_pressed:
+                fov_recompute = True
+                is_spell_cast = True
+                clear_marked()
+                render_all()
 
+            if mouse.rbutton_pressed or key.vk == libtcod.KEY_ESCAPE:
+                fov_recompute = True
+                is_spell_cast = False
+                clear_marked()
+                render_all()
 
+            if is_spell_cast != None:
+                if PATTERN and LINE_COLOR:  #return pattern and lines for drawing possible animations
+                    return is_spell_cast, pattern, line
+                if PATTERN:
+                    return is_spell_cast, pattern
+                if LINE_COLOR:
+                    return is_spell_cast, line
 
-##            elif SPELL_TARGETING_TYPE == "chain":
-##                libtcod.line(player.x, player.y, mouse.cx, mouse.cy, chain_spell_listener)
+    if caster == player and MOVABLE:
+        retu = target_movable_Spell()
+    return retu
 
-
-
-
-
-
+#############################################################################################################
+#############################################################################################################
 
 def handle_keys():
-    global fov_recompute
-    global key
+    global key, fov_recompute
+
+    player.fighter.recover_status()
+
+    if player.fighter.stunned != 0:
+        pass
 
     if key.vk == libtcod.KEY_ENTER and key.lalt: #Alt+Enter: toggle fullscreen
         libtcod.console_set_fullscreen(not libtcod.console_is_fullscreen())
     elif key.vk == libtcod.KEY_ESCAPE:
         return "exit"  #exit game
+
     if game_state == 'playing':
+        #Movement keys
+        key_char = chr(key.c)
+
         if key.vk == libtcod.KEY_UP:
             player_move_or_attack(0, -1)
-
-
         elif key.vk == libtcod.KEY_DOWN:
             player_move_or_attack(0, 1)
-
         elif key.vk == libtcod.KEY_LEFT:
             player_move_or_attack(-1, 0)
-
         elif key.vk == libtcod.KEY_RIGHT:
             player_move_or_attack(1, 0)
-
+        elif key.vk == libtcod.KEY_TAB:
+            pass  #do nothing ie wait for the monster to come to you
+            fov_recompute = True
         else:
             #test for other keys
-            key_char = chr(key.c)
-            if key_char == "g":
+            if key_char == "e":
                 #pick up an item
                 for object in objects:
                     if object.x == player.x and object.y == player.y and object.item:
@@ -919,77 +1305,253 @@ def handle_keys():
                 chosen_item = inventory_menu('Press the key next to an item to use it, or any other to cancel.\n')
                 if chosen_item is not None:
                     chosen_item.use()
+            if key_char == '<':
+                #go down stairs, if the player is on them
+                if stairs.x == player.x and stairs.y == player.y:
+                    next_level()
+            if key_char == 'c':
+                #show character information
+                level_up_xp = LEVEL_UP_BASE + player.level * LEVEL_UP_FACTOR
+                msgbox('Character Information\n\nLevel: ' + str(player.level) + '\nExperience: ' + str(player.fighter.xp) +
+                    '\nExperience to level up: ' + str(level_up_xp) + '\n\nMaximum HP: ' + str(player.fighter.max_hp) +
+                    '\nAttack: ' + str(player.fighter.power) + '\nDefense: ' + str(player.fighter.defense) +
+                    '\nMagic: ' + str(player.fighter.magic), CHARACTER_SCREEN_WIDTH)
             return "didnt-take-turn"
+
 
 #######################################################
 # Initialization & Main Loop
 #######################################################
 
 
-libtcod.console_set_custom_font("TiledFont.png", libtcod.FONT_TYPE_GRAYSCALE | libtcod.FONT_LAYOUT_TCOD, 32, 10)
+libtcod.console_set_custom_font("TiledFont_organised.png", libtcod.FONT_TYPE_GRAYSCALE | libtcod.FONT_LAYOUT_TCOD, 32, 10)
 load_customfont()
 libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, "Gamer Quest", False)
 libtcod.sys_set_fps(LIMIT_FPS)
 con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
+libtcod.console_set_key_color(con, libtcod.white)
 panel = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
 
+monster_chances_jungle = {"goblin" : 50, "tribal" : 30, "green slime" : 20}
+monster_chances_sand = {"sand elemental" : 50, "sand slime" : 30, "stone golem" : 20}
+monster_chances_ice = {"water elemental" : 50, "ice slime" : 30, "evil snowman" : 20}
+monster_chances_hell = {"imp" : 50, "fire slime" : 30, "fire elemental" : 20}
+monster_chances_alien = {"alien"  : 50, "consumer" : 30, "ghost" : 20}
+monster_chances_boss = {"monster1"  : 50, "monster2" : 30, "monster3" : 20} #set these later
+all_monster_chances =  {1 : monster_chances_jungle, 2 : monster_chances_sand, 3 : monster_chances_ice, 4 : monster_chances_hell, 5 : monster_chances_alien, 6 : monster_chances_boss}
 
-#create object representing the player
-fighter_component = Fighter(hp=30, defense=2, power=5, death_function=player_death)
-player = Object(0, 0, player_tile, "player", libtcod.white, blocks=True, fighter=fighter_component)
+all_monsters = {
+                #tile, hp, mp, defense, power, magic, xp, score, corpse, death_function, stun_recovery, fire_resistance, frost_resistance, air_resistance, earth_resistance
+    "goblin" : (goblin, 10, 0, 0, 3, 0, 20, 50,  goblin_dead, monster_death, 1, 0, 0, 0, 0),
+    "tribal" : (tribal, 5, 0, 0, 5, 0, 50, 75, tribal_dead, monster_death, 1, 0, 0, 0, 0),
+    "green slime" : (green_slime, 10, 0, 3, 3, 0, 75, 100, None, monster_death, 1, 0, 0, 0, 0),
 
-#create a list of objects. starting with the player
-objects = [player]
+    "sand elemental" : (sand_elemental, 20, 0, 6, 150, 50, 0, None, monster_death, 1, 0, 0, 10, 10),
+    "sand slime" : (sand_slime, 15, 2, 6, 100, 35, 0, None, monster_death, 1, 0, 0, 0, 10),
+    "stone golem" : (stone_golem, 30, 3, 6, 200, 50, 0, stone_golem_dead, monster_death, 1, 0, 0, 0, 10),
 
-#generate map
-make_map()
+    "water elemental" : (water_elemental, 30, 0, 8, 250, 0, water_elemental_dead, monster_death, 2, 0, 10, 0, 0),
+    "ice slime" : (ice_slime, 20, 3, 7, 200, 100, 0, None, monster_death, 1, 0, 10, 0, 0),
+    "evil snowman" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
 
-#create the fov map, acording to the generated map
-fov_map = libtcod.map_new(MAP_WIDTH, MAP_HEIGHT)
-for y in range(MAP_HEIGHT):
-    for x in range(MAP_WIDTH):
-        libtcod.map_set_properties(fov_map, x, y, not map[x][y].block_sight, not map[x][y].blocked)
+    "imp" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
+    "fire slime" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
+    "fire elemental" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
 
-fov_recompute = True
-animation_playing = False
-game_state = 'playing'
-player_action = None
+    "alien" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
+    "consumer" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
+    "ghost" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
 
-#empty list to store game messages and their colors
-game_msgs = []
+    "monster1" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
+    "monster2" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
+    "monster3" : (evil_snowman, 20, 0, 5, 300, 100, 0,  None, monster_death, 1, 0, 10, 0, 0),
+}
 
-#test, welcoming message!
-message('Welcome to gamer dungeon adventurer, stay as long as you like or stay FOREVER!', libtcod.red)
+#itmes
+item_category_chances = {"score" : 60, "consumable" : 40}
+score_chances = {"gold coin" : 69, "amethyst" : 20, "emerald" : 9, "strange artifact" : 1}
+consuable_chances = {"healing potion" : 30, "mana potion" : 20, "fireball scroll" : 10, "arcane scroll" : 10, "freeze scroll" : 10, "shock scroll" : 10, "bomb" : 10}
 
-mouse = libtcod.Mouse()
-key = libtcod.Key()
+all_score_items = {
+    "gold coin" : (coin, 50),
+    "amethyst" : (amethyst, 500),
+    "emerald" : (emerald, 2000),
+    "strange artifact" :(nuclear_warhead ,10000),
+}
 
-#set inventory
-inventory = []
+all_items = {
+    "healing potion" : (red_potion, cast_heal),
+    "mana potion" : (blue_potion, cast_regen_mana),
+    "bomb" : (bomb, cast_bomb),
+    "scroll of fireball" : (fire_scroll, cast_fireball),
+    "scroll of lightning" : (lightning_scroll, cast_lightning),
+    "scroll of freeze" : (ice_scroll, cast_freeze),
+    "scroll of arcane beam" : (arcane_scroll, cast_arcane_beam),
+    "major healing potion" : (major_red_potion, cast_heal), #edit later
+    "major mana potion" : (major_blue_potion, cast_regen_mana), #
+    "gamer quest cola" : (cola, cast_heal), #
+    "ice cream" : (ice_cream, cast_heal), #
+}
 
-def main():
-    global objects
-    global game_state
+##ALL ITEM SPAWN CHANCES FOR EVERY LEVEL
+item_chances_jungle = {
+    "healing potion" : 20, "mana potion" : 10, "bomb" : 30, "scroll of fireball" : 10, "scroll of lightning" : 10,
+    "scroll of freeze" : 10, "scroll of arcane beam" : 10
+}
+item_chances_sand = {
+    "healing potion" : 15, "mana potion" : 7, "bomb" : 30, "scroll of fireball" : 10, "scroll of lighning" : 10,
+    "scroll of freeze" : 10, "scroll of arcane beam" : 10, "major healing potion" : 5, "major mana potion" : 3
+}
+item_chances_ice = {
+  "ice cream" : 8, "mana potion" : 5, "bomb" : 30, "scroll of fireball" : 10, "scroll of lighning" : 10,
+  "scroll of freeze" : 10, "scroll of arcane beam" : 10, "major healing potion" : 8, "major mana potion" : 5,
+  "gamer quest cola" : 4
+}
+item_chances_hell  = {
+  "healing potion" : 5, "mana potion" : 3, "bomb" : 30, "scroll of fireball" : 10, "scroll of lighning" : 10,
+  "scroll of freeze" : 10, "scroll of arcane beam" : 10, "major healing potion" : 10, "major mana potion" : 7,
+  "gamer quest cola" : 5
+}
+item_chances_alien  = {
+  "bomb" : 30, "scroll of fireball" : 10, "scroll of lighning" : 10,
+  "scroll of freeze" : 10, "scroll of arcane beam" : 10, "major healing potion" : 15, "major mana potion" : 10,
+  "gamer quest cola" : 5
+}
+item_chances_boss  = {
+  "bomb" : 30, "scroll of fireball" : 10, "scroll of lighning" : 10,
+  "scroll of freeze" : 10, "scroll of arcane beam" : 10, "major healing potion" : 10, "major mana potion" : 10,
+  "gamer quest cola" : 10
+}
+all_item_chances = {1 : item_chances_jungle, 2 : item_chances_sand, 3 : item_chances_ice, 4 : item_chances_hell, 5 : item_chances_alien, 6 : item_chances_boss}
 
 
+def save_game():
+    #open a new empty shelve (possibly overwriting an old one) to write the game data
+    file = shelve.open('savegame', 'n')
+    file['map'] = map
+    file['objects'] = objects
+    file["player_index"] = player #index of player in objects list
+    file["inventory"] = inventory
+    file["game_msgs"] = game_msgs
+    file["game_state"] = game_state
+    file.close()
+
+def load_game():
+    #open the previously saved shelve and load the game data
+    global map, objects, player, inventory, game_msgs, game_state
+
+    file = shelve.open('savegame', 'r')
+    map = file['map']
+    objects = file['objects']
+    player = objects[file['player_index']]  #get index of player in objects list and access it
+    inventory = file['inventory']
+    game_msgs = file['game_msgs']
+    game_state = file['game_state']
+    file.close()
+
+    initialize_fov()
+
+def msgbox(text, width=50):
+    menu(text, [], width)  #use menu() as a sort of "message box"
+
+def main_menu():
+    #img = libtcod.image_load('menu_background.png')
 
     while not libtcod.console_is_window_closed():
+        #show the background image, at twice the regular console resolution
+        #libtcod.image_blit_2x(img, 0, 0, 0)
+
+        #show options and wait for the player's choice
+        choice = menu('', ['Play a new game', 'Continue last game', 'Quit'], 24)
+
+        if choice == 0:  #new game
+            new_game()
+            play_game()
+
+        if choice == 1:  #load last game
+            try:
+                load_game()
+            except:
+                msgbox('\n No saved game to load.\n', 24)
+                continue
+            play_game()
+
+        elif choice == 2:  #quit
+            break
+
+
+def new_game():
+    global player, inventory, game_msgs, game_state, dungeon_level
+
+    #create object representing the player
+    fighter_component = Fighter(hp=30, mp=30, defense=2, power=30, magic=1, xp=0, score=0, death_function=player_death)
+    player = Object(0, 0, mage, "player", libtcod.white, blocks=True, fighter=fighter_component)
+    player.level = 1
+
+    dungeon_level = 1
+
+    #generate map
+    make_map()
+
+    initialize_fov()
+
+    game_state = "playing"
+    inventory = []
+
+    #create the list of game messages and their colors
+    game_msgs = []
+
+    #create a list of objects. starting with the player
+    objects = [player]
+
+    #test, welcoming message!
+    message('Welcome to gamer dungeon adventurer, stay as long as you like or stay FOREVER!', libtcod.red)
+
+
+def initialize_fov():
+    global fov_recompute, fov_map
+    fov_recompute = True
+    libtcod.console_clear(con)
+
+    #create the fov map, acording to the generated map
+    fov_map = libtcod.map_new(MAP_WIDTH, MAP_HEIGHT)
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            libtcod.map_set_properties(fov_map, x, y, not map[x][y].block_sight, not map[x][y].blocked)
+
+def play_game():
+    global key, mouse
+
+    player_action = None
+    mouse = libtcod.Mouse()
+    key = libtcod.Key()
+    while not libtcod.console_is_window_closed():
+
+        #render the screen
         libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS|libtcod.EVENT_MOUSE,key,mouse)
-        #libtcod.console_set_default_foreground(0, libtcod.white)
-        render_all() #draw everything
+        render_all()
 
         libtcod.console_flush()
+
+        check_level_up()
+
         for object in objects: #clear all the objects
             object.clear()
 
         player_action = handle_keys()
+        if player_action == "exit":
+            save_game()
+            break
+
         if game_state == "playing" and player_action != "didnt-take-turn":
             for object in objects:
                 if object.ai:
                     object.ai.take_turn()
-        if player_action == "exit":
-            break
 
+#show the game's title, and some credits!
+libtcod.console_set_default_foreground(0, libtcod.light_yellow)
+libtcod.console_print_ex(0, int(SCREEN_WIDTH/2), int(SCREEN_HEIGHT/2-4), libtcod.BKGND_NONE, libtcod.CENTER, 'GAMER QUEST')
+libtcod.console_print_ex(0, int(SCREEN_WIDTH/2), SCREEN_HEIGHT-2, libtcod.BKGND_NONE, libtcod.CENTER, 'By Milo Komulainen & Markus Suomela')
 
-if __name__ == '__main__':
-    main()
+main_menu()
+
